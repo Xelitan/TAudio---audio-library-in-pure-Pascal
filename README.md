@@ -1,11 +1,11 @@
 # TAudio - audio library in pure Pascal
 
-Requires no DLLs or external programs. Decodes MP3, WAV, AU, OGG, AIFF.
+Requires no DLLs or external programs. Reads MP3, WAV, AU, OGG, AIFF, CAF, FLAC, XM, MOD, IT, S3M. Writes WAV, MP3, AU, AIFF, FLAC.
 
 ## How to start?
-Add to uses:
+Install package and add to uses:
 ```
-xAudio, xAIFF, xMP3, xOGG, xAU, xWav
+XelAudio
 ```
 
 ## Converting file
