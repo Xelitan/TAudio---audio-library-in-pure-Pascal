@@ -4,13 +4,12 @@ interface
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
-// Description:	TAudio - convert and modify sound files                       //
-// Version:	0.1                                                           //
-// Date:	26-APR-2025                                                   //
+// Description:	XelTAudio - convert and modify sound files                    //
+// Version:	0.2                                                           //
+// Date:	16-JUL-2026                                                   //
 // License:     MIT                                                           //
 // Target:	Win64, Free Pascal, Delphi                                    //
-// Based on:    PascalVault                                                   //
-// Copyright:	(c) 2025 Xelitan.com.                                         //
+// Copyright:	(c) 2026 Xelitan.com.                                         //
 //		All rights reserved.                                          //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
@@ -49,6 +48,8 @@ type
 
      function GetF: Single; inline;
      function GetMF: Single; inline; //Single
+     function GetD: Double; inline;
+     function GetMD: Double; inline;
      function GetV: Int64; inline; //variable-length integer
 
      function GetLn(UntilCh: String = ''): String;
@@ -88,6 +89,7 @@ type
      procedure PutU3(V: Cardinal); inline;
      procedure PutU4(V: Cardinal); inline;
      procedure PutMU2(V: Word); inline;
+     procedure PutMU3(V: Cardinal); inline;
      procedure PutMU4(V: Cardinal); inline;
 
      procedure PutI(V: ShortInt); inline;
@@ -191,9 +193,10 @@ end;
 
 function TReader.GetMU3: Cardinal;
 begin
+  Result := 0;
   Move(Buf[FPos], Result, 3);
 
-  Result := SwapEndian(Result);
+  Result := SwapEndian(Result) shr 8;
   Inc(FPos, 3);
 end;
 
@@ -233,9 +236,12 @@ end;
 
 function TReader.GetMI3: LongInt;
 begin
+  Result := 0;
   Move(Buf[FPos], Result, 3);
 
-  Result := SwapEndian(Result);
+  Result := LongInt(SwapEndian(Cardinal(Result)) shr 8);
+  if Result >= $800000 then Dec(Result, $1000000); //sign extend 24 bit
+
   Inc(FPos, 3);
 end;
 
@@ -263,6 +269,23 @@ begin
   Temp := SwapEndian(Temp);
 
   Inc(FPos, 4);
+end;
+
+function TReader.GetD: Double;
+var Temp: QWord absolute Result;
+begin
+  Move(Buf[FPos], Temp, 8);
+
+  Inc(FPos, 8);
+end;
+
+function TReader.GetMD: Double;
+var Temp: QWord absolute Result;
+begin
+  Move(Buf[FPos], Temp, 8);
+
+  Temp := SwapEndian(Temp);
+  Inc(FPos, 8);
 end;
 
 function TReader.GetV: Int64;
@@ -347,8 +370,11 @@ begin
   Count2 := FSize-FPos;
   if Count2 < Count then Count := Count2;
 
+  //Result typu zarzadzanego wchodzi ze smieciowa referencja - nil przed
+  //SetLength; a Move na pustej tablicy (Count=0) to blad zakresu
+  Result := nil;
   SetLength(Result, Count);
-  Move(Buf[FPos], Result[0], Count);
+  if Count > 0 then Move(Buf[FPos], Result[0], Count);
   Inc(FPos, Count);
 end;
 
@@ -403,7 +429,7 @@ end;
 
 function TReader.Eof: Boolean;
 begin
-  Result := FPos = FSize;
+  Result := FPos >= FSize;
 end;
 
 constructor TReader.Create(Str: TStream; Length: Integer);
@@ -477,6 +503,16 @@ begin
 
   Move(V, Buf[FPos], 2);
   Inc(FPos, 2);
+end;
+
+procedure TWriter.PutMU3(V: Cardinal);
+begin
+  if FPos+3 > FSize then Flush;
+
+  Buf[FPos]   := (V shr 16) and $FF;
+  Buf[FPos+1] := (V shr 8) and $FF;
+  Buf[FPos+2] := V and $FF;
+  Inc(FPos, 3);
 end;
 
 procedure TWriter.PutMU4(V: Cardinal);

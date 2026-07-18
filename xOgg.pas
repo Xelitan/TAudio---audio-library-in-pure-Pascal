@@ -4,12 +4,12 @@ interface
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
-// Description:	TAudio - convert and modify sound files                       //
-// Version:	0.1                                                           //
-// Date:	26-APR-2025                                                   //
+// Description:	XelTAudio - convert and modify sound files                    //
+// Version:	0.2                                                           //
+// Date:	16-JUL-2026                                                   //
 // License:     MIT                                                           //
 // Target:	Win64, Free Pascal, Delphi                                    //
-// Copyright:	(c) 2025 Xelitan.com.                                         //
+// Copyright:	(c) 2026 Xelitan.com.                                         //
 //		All rights reserved.                                          //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////

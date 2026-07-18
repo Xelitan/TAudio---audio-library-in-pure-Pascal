@@ -1963,32 +1963,42 @@ begin
   { Check for invalid values and impossible combinations }
   if (id.GFrameHeader.Id <> 1) then
   begin
+    {$ifdef PDMP3_DEBUG}
     WriteLn('ID must be 1');
     WriteLn('Header=', IntToHex(header, 8), ' at file pos ', Get_Filepos(id));
+    {$endif}
     Exit;
   end;
   if (id.GFrameHeader.BitrateIndex = 0) then
   begin
+    {$ifdef PDMP3_DEBUG}
     WriteLn('Free bitrate format NIY!');
     WriteLn('Header=', IntToHex(header, 8), ' at file pos ', Get_Filepos(id));
+    {$endif}
     Exit;
   end;
   if (id.GFrameHeader.BitrateIndex = 15) then
   begin
+    {$ifdef PDMP3_DEBUG}
     WriteLn('bitrate_index = 15 is invalid!');
     WriteLn('Header=', IntToHex(header, 8), ' at file pos ', Get_Filepos(id));
+    {$endif}
     Exit;
   end;
   if (id.GFrameHeader.SamplingFrequency = 3) then
   begin
+    {$ifdef PDMP3_DEBUG}
     WriteLn('sampling_frequency = 3 is invalid!');
     WriteLn('Header=', IntToHex(header, 8), ' at file pos ', Get_Filepos(id));
+    {$endif}
     Exit;
   end;
   if (id.GFrameHeader.Layer = 0) then
   begin
+    {$ifdef PDMP3_DEBUG}
     WriteLn('layer = 0 is invalid!');
     WriteLn('Header=', IntToHex(header, 8), ' at file pos ', Get_Filepos(id));
+    {$endif}
     Exit;
   end;
 

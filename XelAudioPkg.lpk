@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="5">
+    <Name Value="XelAudioPkg"/>
+    <Author Value="Xelitan.com"/>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <SearchPaths>
+        <OtherUnitFiles Value=".;lame"/>
+        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
+      </SearchPaths>
+    </CompilerOptions>
+    <Description Value="Play and edit audio files. Supports WAV, MP3, OGG, AIFF, AU, CAF, MOD, XM, S3M, IT"/>
+    <License Value="MIT"/>
+    <Version Minor="1"/>
+    <Files Count="31">
+      <Item1>
+        <Filename Value="XelAudio.pas"/>
+        <HasRegisterProc Value="True"/>
+        <UnitName Value="XelAudio"/>
+      </Item1>
+      <Item2>
+        <Filename Value="mp3.pas"/>
+        <UnitName Value="mp3"/>
+      </Item2>
+      <Item3>
+        <Filename Value="vorbis.pas"/>
+        <UnitName Value="vorbis"/>
+      </Item3>
+      <Item4>
+        <Filename Value="xAIFF.pas"/>
+        <UnitName Value="xAIFF"/>
+      </Item4>
+      <Item5>
+        <Filename Value="xAU.pas"/>
+        <UnitName Value="xAU"/>
+      </Item5>
+      <Item6>
+        <Filename Value="xAudioBase.pas"/>
+        <UnitName Value="xAudioBase"/>
+      </Item6>
+      <Item7>
+        <Filename Value="xCAF.pas"/>
+        <UnitName Value="xCAF"/>
+      </Item7>
+      <Item8>
+        <Filename Value="xFlac.pas"/>
+        <UnitName Value="xFlac"/>
+      </Item8>
+      <Item9>
+        <Filename Value="xFunctions.pas"/>
+        <UnitName Value="xFunctions"/>
+      </Item9>
+      <Item10>
+        <Filename Value="xMP3.pas"/>
+        <UnitName Value="xMP3"/>
+      </Item10>
+      <Item11>
+        <Filename Value="xOgg.pas"/>
+        <UnitName Value="xOgg"/>
+      </Item11>
+      <Item12>
+        <Filename Value="xStreams.pas"/>
+        <UnitName Value="xStreams"/>
+      </Item12>
+      <Item13>
+        <Filename Value="xTracker.pas"/>
+        <UnitName Value="xTracker"/>
+      </Item13>
+      <Item14>
+        <Filename Value="xWav.pas"/>
+        <UnitName Value="xWav"/>
+      </Item14>
+      <Item15>
+        <Filename Value="lame\LameBitstream.pas"/>
+        <UnitName Value="LameBitstream"/>
+      </Item15>
+      <Item16>
+        <Filename Value="lame\LameCore.pas"/>
+        <UnitName Value="LameCore"/>
+      </Item16>
+      <Item17>
+        <Filename Value="lame\LameEncoder.pas"/>
+        <UnitName Value="LameEncoder"/>
+      </Item17>
+      <Item18>
+        <Filename Value="lame\LameFFT.pas"/>
+        <UnitName Value="LameFFT"/>
+      </Item18>
+      <Item19>
+        <Filename Value="lame\LameMDCT.pas"/>
+        <UnitName Value="LameMDCT"/>
+      </Item19>
+      <Item20>
+        <Filename Value="lame\LamePsyModel.pas"/>
+        <UnitName Value="LamePsyModel"/>
+      </Item20>
+      <Item21>
+        <Filename Value="lame\LameQuantize.pas"/>
+        <UnitName Value="LameQuantize"/>
+      </Item21>
+      <Item22>
+        <Filename Value="lame\LameQuantizePvt.pas"/>
+        <UnitName Value="LameQuantizePvt"/>
+      </Item22>
+      <Item23>
+        <Filename Value="lame\LameReservoir.pas"/>
+        <UnitName Value="LameReservoir"/>
+      </Item23>
+      <Item24>
+        <Filename Value="lame\LameSimple.pas"/>
+        <UnitName Value="LameSimple"/>
+      </Item24>
+      <Item25>
+        <Filename Value="lame\LameTables.pas"/>
+        <UnitName Value="LameTables"/>
+      </Item25>
+      <Item26>
+        <Filename Value="lame\LameTakehiro.pas"/>
+        <UnitName Value="LameTakehiro"/>
+      </Item26>
+      <Item27>
+        <Filename Value="lame\LameTypes.pas"/>
+        <UnitName Value="LameTypes"/>
+      </Item27>
+      <Item28>
+        <Filename Value="lame\LameUtils.pas"/>
+        <UnitName Value="LameUtils"/>
+      </Item28>
+      <Item29>
+        <Filename Value="lame\LameVbrTag.pas"/>
+        <UnitName Value="LameVbrTag"/>
+      </Item29>
+      <Item30>
+        <Filename Value="xPlayback.pas"/>
+        <UnitName Value="xPlayback"/>
+      </Item30>
+      <Item31>
+        <Filename Value="xAudio.pas"/>
+        <UnitName Value="xAudio"/>
+      </Item31>
+    </Files>
+    <CompatibilityMode Value="True"/>
+    <RequiredPkgs Count="2">
+      <Item1>
+        <PackageName Value="LCL"/>
+      </Item1>
+      <Item2>
+        <PackageName Value="FCL"/>
+      </Item2>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+  </Package>
+</CONFIG>

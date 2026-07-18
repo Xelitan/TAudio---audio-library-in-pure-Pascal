@@ -4,14 +4,15 @@ interface
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
-// Description:	TAudio - convert and modify sound files                       //
-// Version:	0.1                                                           //
-// Date:	26-APR-2025                                                   //
+// Description:	Helper functions                                              //
+// Version:	0.2                                                           //
+// Date:	16-JUL-2026                                                   //
 // License:     MIT                                                           //
 // Target:	Win64, Free Pascal, Delphi                                    //
-// Copyright:	(c) 2025 Xelitan.com.                                         //
+// Copyright:	(c) 2026 Xelitan.com.                                         //
 //		All rights reserved.                                          //
 //                                                                            //
+// Usage: if 'Hello' in Group('Hello', 'World', 'Planet', 'Greetings') then   //
 ////////////////////////////////////////////////////////////////////////////////
 
 uses Classes, SysUtils;
@@ -28,6 +29,8 @@ var z: Integer;
 begin
   Ar := TStringArray.Create(A,B,C,D,E, F,G,H,I,J);
 
+  Len := 1;
+
   for z:=9 downto 1 do begin
     if Ar[z] <> '' then begin
         Len := z+1;
@@ -35,6 +38,7 @@ begin
       end;
   end;
 
+  Result := nil;
   SetLength(Result, Len);
 
   for z:=0 to Len-1 do Result[z] := Ar[z];

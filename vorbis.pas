@@ -1360,7 +1360,10 @@ begin
    {$ENDIF}
 end;
 
-function set_file_offset(f:pvorb; loc:longint):boolean;
+//loc jest uint32 jak w oryginalnym stb_vorbis - z longint straznik 2 GB
+//(loc>=$80000000) byl martwy (zawsze falsz), a test przepelnienia
+//loc+f_start<loc mial inna semantyke niz w C
+function set_file_offset(f:pvorb; loc:Cardinal):boolean;
 begin
    Result:=false;
    {$IFNDEF STB_VORBIS_NO_PUSHDATA_API}
