@@ -1,4 +1,4 @@
-# TAudio - audio library in pure Pascal
+# TXelAudio - audio library in pure Pascal
 
 Requires no DLLs or external programs. Reads MP3, WAV, AU, OGG, AIFF, CAF, FLAC, XM, MOD, IT, S3M. Writes WAV, MP3, AU, AIFF, FLAC.
 
@@ -13,14 +13,15 @@ XelAudio
 ```
   if not OpenDialog1.Execute then Exit;
 
-  a := TAudio.Create;
+  a := TXelAudio.Create;
   a.LoadFromFile(OpenDialog1.Filename);
   a.SaveToFile('output.wav');
+  a.SaveToFile('output.mp3', 128);
   a.Free;
 ```
 
 ## Other functions
-Methods of TAudio:
+Methods of TXelAudio:
 ```
     function FindPeak: Integer;
     procedure Cut(FromTime, ToTime: Integer);
