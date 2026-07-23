@@ -505,36 +505,55 @@ begin
 end;
 
 procedure TXelAudio.Waveform(Bmp: TBitmap);
-var i: Integer;
-    ScaleX, ScaleY: Extended;
-    j: Integer;
-    Sum: Extended;
-    Divv: Integer;
+var i, j: Integer;
+    FromIdx, ToIdx: Integer;
+    MinV, MaxV, V: LongInt;
     HalfHei: Integer;
+    YTop, YBottom: Integer;
+    Peak: Integer;
 begin
-  Divv := Floor(TotalSamples / Bmp.Width);
-  if Divv < 1 then Exit;
+  if (TotalSamples < 1) or (Bmp.Width < 1) or (Bmp.Height < 2) then Exit;
 
   HalfHei := Bmp.Height div 2;
+
+  Peak := FindPeak;
+  if Peak < 1 then begin //silence, just the zero line
+    Bmp.Canvas.Pen.Color := clRed;
+    Bmp.Canvas.MoveTo(0, HalfHei);
+    Bmp.Canvas.LineTo(Bmp.Width, HalfHei);
+    Exit;
+  end;
 
   Bmp.Canvas.Pen.Color := clRed;
 
   for i:=0 to Bmp.Width-1 do begin
+    FromIdx := Int64(i)   * TotalSamples div Bmp.Width;
+    ToIdx   := Int64(i+1) * TotalSamples div Bmp.Width - 1;
+    if ToIdx < FromIdx then ToIdx := FromIdx;
+    if ToIdx > TotalSamples-1 then ToIdx := TotalSamples-1;
 
-    Sum := 0;
+    MinV := 0;
+    MaxV := 0;
 
-    for j:=0 to Divv-1 do begin
-      Sum := Sum + SampleToSigned(FFrames[i*Divv+j].Left, FSampleSize);
+    for j:=FromIdx to ToIdx do begin
+      V := SampleToSigned(FFrames[j].Left, FSampleSize);
+      if V < MinV then MinV := V;
+      if V > MaxV then MaxV := V;
+
+      V := SampleToSigned(FFrames[j].Right, FSampleSize);
+      if V < MinV then MinV := V;
+      if V > MaxV then MaxV := V;
     end;
 
-    Sum := Sum / Divv;
+    //positive amplitude goes up
+    YTop    := HalfHei - Round(MaxV / Peak * HalfHei);
+    YBottom := HalfHei - Round(MinV / Peak * HalfHei);
 
-    if Sum > 0 then Sum := (Sum/4000) * HalfHei
-    else            Sum := (Sum/-4000) * -HalfHei;
+    if YTop < 0 then YTop := 0;
+    if YBottom > Bmp.Height-1 then YBottom := Bmp.Height-1;
 
-    Bmp.Canvas.MoveTo(i, HalfHei);
-    Bmp.Canvas.LineTo(i, HalfHei+Round(Sum));
-
+    Bmp.Canvas.MoveTo(i, YTop);
+    Bmp.Canvas.LineTo(i, YBottom+1);
   end;
 end;
 
