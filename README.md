@@ -1,6 +1,7 @@
 # TXelAudio - audio library in pure Pascal
 
-Requires no DLLs or external programs. Reads MP3, WAV, AU, OGG, AIFF, CAF, FLAC, XM, MOD, IT, S3M. Writes WAV, MP3, AU, AIFF, FLAC.
+Requires no DLLs or external programs. Reads MP3, WAV, AU, OGG, AIFF, CAF, FLAC, AC3, E-AC3, AAC, XM, MOD, IT, S3M. Writes WAV, MP3, AU, AIFF, FLAC.
+It can read audio tracks from: AVI, MKV, MP4/M4A.
 
 ## How to start?
 Install package and add to uses:
