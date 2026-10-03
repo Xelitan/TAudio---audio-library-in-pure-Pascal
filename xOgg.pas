@@ -47,37 +47,38 @@ begin
 
   Str.Read(Buf[0], Len);
 
+  b2 := nil;
+  Info := nil;
+  NumChannels := 0;
   try
     NumFrames := stb_vorbis_decode_memory(buf, len, NumChannels, b2, Info);
   except
     Exit;
   end;
 
-  FHandle.FSampleSize := 16;
-  FHandle.FSampleRate := Info^.sample_rate;
+  try
+    if (NumFrames <= 0) or (Info = nil) or (b2 = nil) or (NumChannels < 1) then Exit;
 
-  SetLength(FHandle.FFrames, NumFrames);
+    FHandle.FSampleSize := 16;
+    FHandle.FSampleRate := Info^.sample_rate;
 
-  Mem := TMemoryStream.Create;
-  Mem.Write(B2^, NumFrames*2);
-  Mem.Position := 0;
+    SetLength(FHandle.FFrames, NumFrames);
 
-  r := TReader.Create(Mem);
+    //b2 holds NumFrames * NumChannels interleaved samples; extra channels
+    //(more than 2) are skipped
+    for i:=0 to NumFrames-1 do begin
+      FHandle.FFrames[i].Left := Word(b2[i*NumChannels]);
+      if NumChannels > 1 then
+        FHandle.FFrames[i].Right := Word(b2[i*NumChannels + 1])
+      else
+        FHandle.FFrames[i].Right := 0;
+    end;
 
-  for i:=0 to NumFrames-1 do begin
-    FHandle.FFrames[i].Left := 0;
-    FHandle.FFrames[i].Right := 0;
+    Result := True;
+  finally
+    if b2 <> nil then FreeMem(b2);
+    if Info <> nil then stb_vorbis_close(Info);
   end;
-
-  for i:=0 to NumFrames-1 do begin
-    FHandle.FFrames[i].Left  := r.getU2;
-    if NumChannels > 1 then
-      FHandle.FFrames[i].Right := r.getU2;
-  end;
-
-  Result := True;
-  Mem.Free;
-  r.Free;
 end;
 
 initialization

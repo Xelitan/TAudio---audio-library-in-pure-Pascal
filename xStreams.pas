@@ -4,7 +4,7 @@ interface
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
-// Description:	XelTAudio - convert and modify sound files                    //
+// Description:	TXelAudio - convert and modify sound files                    //
 // Version:	0.2                                                           //
 // Date:	16-JUL-2026                                                   //
 // License:     MIT                                                           //

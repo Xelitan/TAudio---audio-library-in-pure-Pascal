@@ -12,7 +12,7 @@ uses
   xMP3, xOgg, xStreams, xTracker, xWav, LameBitstream, LameCore, LameEncoder, 
   LameFFT, LameMDCT, LamePsyModel, LameQuantize, LameQuantizePvt, 
   LameReservoir, LameSimple, LameTables, LameTakehiro, LameTypes, LameUtils, 
-  LameVbrTag, xPlayback, xAudio;
+  LameVbrTag, xPlayback, xAudio, xAAC, xM4A, xSBR, xAC3, xDemux, xMKV, xAVI;
 
 implementation
 

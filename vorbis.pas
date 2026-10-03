@@ -1996,7 +1996,7 @@ begin
       DECODE_VQ(z,f,c);
 
       if z < 0 then begin
-         if f^.bytes_in_seg>0 then
+         if f^.bytes_in_seg=0 then
             if f^.last_seg then begin Result:=false; Exit; end;
          Result:=error(f, VORBIS_invalid_stream);
          Exit;
