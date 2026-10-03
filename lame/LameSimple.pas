@@ -16,7 +16,8 @@ type
 
   TPCMInfo = record
     NumChannels: Word;       // 1 = mono, 2 = stereo
-    BitsPerSample: Word;     // original WAV depth: 8 or 16
+    BitsPerSample: Word;     // original WAV depth: 8, 16, 24, 32 (int or float) or 64 (float)
+    IsFloat: Boolean;        // original WAV samples were IEEE float
     SampleRate: Cardinal;    // Hz
     NumSamples: Cardinal;    // sample frames per channel
     DataSize: Cardinal;      // original PCM payload size in bytes
@@ -32,6 +33,20 @@ const
   function PCMToMP3(const Samples: TPCMSamples; const Info: TPCMInfo; BitrateKbps: Integer): TBytes;
 
 implementation
+
+uses
+  Math;
+
+const
+  WAVE_FORMAT_PCM        = $0001;
+  WAVE_FORMAT_IEEE_FLOAT = $0003;
+  WAVE_FORMAT_EXTENSIBLE = $FFFE;
+  // KSDATAFORMAT_SUBTYPE_PCM {00000001-0000-0010-8000-00AA00389B71} and
+  // KSDATAFORMAT_SUBTYPE_IEEE_FLOAT {00000003-...} in on-disk byte order.
+  // The first two bytes hold the plain format tag; the rest is shared.
+  KSDATAFORMAT_SUBTYPE_TAIL: array[0..13] of Byte = (
+    $00, $00, $00, $00, $10, $00,
+    $80, $00, $00, $AA, $00, $38, $9B, $71);
 
 function FourCCEquals(const B: TBytes; Offset: Integer; const S: AnsiString): Boolean;
 begin
@@ -69,6 +84,29 @@ begin
   Result := SmallInt(U);
 end;
 
+function ClampToSmallInt(V: Int64): SmallInt;
+begin
+  if V > High(SmallInt) then
+    Result := High(SmallInt)
+  else if V < Low(SmallInt) then
+    Result := Low(SmallInt)
+  else
+    Result := SmallInt(V);
+end;
+
+// Scales a float sample in [-1.0, 1.0] to 16-bit, rounding and clipping.
+function FloatToSmallInt(F: Double): SmallInt;
+begin
+  if IsNan(F) then
+    Result := 0
+  else if F >= 1.0 then
+    Result := High(SmallInt)
+  else if F <= -1.0 then
+    Result := Low(SmallInt)
+  else
+    Result := ClampToSmallInt(Round(F * 32768.0));
+end;
+
 // Converts a complete WAV file held in memory into signed 16-bit interleaved PCM.
 // The RIFF/WAVE header and all non-audio chunks are stripped.
 function WAVToPCM(const WavBytes: TBytes; out Info: TPCMInfo): TPCMSamples;
@@ -76,8 +114,11 @@ var
   Pos, ChunkSize, DataOffset: Integer;
   AudioFormat, BlockAlign: Word;
   FmtFound, DataFound: Boolean;
-  I, SampleCount: Integer;
+  I, SampleCount, BytesPerSample, Offset: Integer;
   B: Byte;
+  V: Int64;
+  U32: Cardinal;
+  U64: UInt64;
 begin
   Result := nil;
   FillChar(Info, SizeOf(Info), 0);
@@ -113,12 +154,29 @@ begin
       BlockAlign := ReadLE16(WavBytes, Pos + 12);
       Info.BitsPerSample := ReadLE16(WavBytes, Pos + 14);
 
-      if AudioFormat <> 1 then
-        raise Exception.Create('Only uncompressed PCM WAV files are supported.');
+      if AudioFormat = WAVE_FORMAT_EXTENSIBLE then
+      begin
+        // WAVE_FORMAT_EXTENSIBLE: the real format is the SubFormat GUID at
+        // offset 24 of the fmt chunk; only the PCM and IEEE float subtypes are accepted.
+        if ChunkSize < 40 then
+          raise Exception.Create('Invalid WAV file: extensible fmt chunk is too small.');
+        if not CompareMem(@WavBytes[Pos + 26], @KSDATAFORMAT_SUBTYPE_TAIL[0], 14) then
+          raise Exception.Create('Only uncompressed PCM or IEEE float WAV files are supported.');
+        AudioFormat := ReadLE16(WavBytes, Pos + 24);
+      end;
+
+      if not (AudioFormat in [WAVE_FORMAT_PCM, WAVE_FORMAT_IEEE_FLOAT]) then
+        raise Exception.Create('Only uncompressed PCM or IEEE float WAV files are supported.');
+      Info.IsFloat := AudioFormat = WAVE_FORMAT_IEEE_FLOAT;
       if not (Info.NumChannels in [1, 2]) then
         raise Exception.Create('Only mono and stereo WAV files are supported.');
-      if not (Info.BitsPerSample in [8, 16]) then
-        raise Exception.Create('Only 8-bit and 16-bit PCM WAV files are supported.');
+      if Info.IsFloat then
+      begin
+        if not (Info.BitsPerSample in [32, 64]) then
+          raise Exception.Create('Only 32-bit and 64-bit IEEE float WAV files are supported.');
+      end
+      else if not (Info.BitsPerSample in [8, 16, 24, 32]) then
+        raise Exception.Create('Only 8, 16, 24 and 32-bit PCM WAV files are supported.');
       if BlockAlign <> Info.NumChannels * (Info.BitsPerSample div 8) then
         raise Exception.Create('Invalid WAV file: unexpected block alignment.');
 
@@ -141,24 +199,56 @@ begin
   if not DataFound then
     raise Exception.Create('Invalid WAV file: missing data chunk.');
 
-  BlockAlign := Info.NumChannels * (Info.BitsPerSample div 8);
+  BytesPerSample := Info.BitsPerSample div 8;
+  BlockAlign := Info.NumChannels * BytesPerSample;
   Info.NumSamples := Info.DataSize div BlockAlign;
   SampleCount := Integer(Info.NumSamples) * Integer(Info.NumChannels);
   SetLength(Result, SampleCount);
 
-  if Info.BitsPerSample = 16 then
+  // Everything is reduced to signed 16-bit, which is what LAME encodes.
+  for I := 0 to SampleCount - 1 do
   begin
-    for I := 0 to SampleCount - 1 do
-      Result[I] := ReadLESmallInt(WavBytes, DataOffset + I * 2);
-  end
-  else
-  begin
-    // WAV 8-bit PCM is unsigned. Convert to signed 16-bit for LAME.
-    for I := 0 to SampleCount - 1 do
+    Offset := DataOffset + I * BytesPerSample;
+    if Info.IsFloat then
     begin
-      B := WavBytes[DataOffset + I];
-      Result[I] := SmallInt(Integer(B) - 128) * 256;
-    end;
+      if BytesPerSample = 4 then
+      begin
+        U32 := ReadLE32(WavBytes, Offset);
+        Result[I] := FloatToSmallInt(PSingle(@U32)^);
+      end
+      else
+      begin
+        U64 := UInt64(ReadLE32(WavBytes, Offset)) or
+               (UInt64(ReadLE32(WavBytes, Offset + 4)) shl 32);
+        Result[I] := FloatToSmallInt(PDouble(@U64)^);
+      end;
+    end
+    else
+      case BytesPerSample of
+        1:
+        begin
+          // WAV 8-bit PCM is unsigned.
+          B := WavBytes[Offset];
+          Result[I] := SmallInt(Integer(B) - 128) * 256;
+        end;
+        2:
+          Result[I] := ReadLESmallInt(WavBytes, Offset);
+        3:
+        begin
+          // sign-extend 24-bit, then drop 8 bits with rounding
+          V := Int64(WavBytes[Offset]) or (Int64(WavBytes[Offset + 1]) shl 8) or
+               (Int64(WavBytes[Offset + 2]) shl 16);
+          if V >= $800000 then
+            Dec(V, $1000000);
+          Result[I] := ClampToSmallInt((V + 128) div 256 - Ord((V + 128) mod 256 < 0));
+        end;
+      else
+        begin
+          // 32-bit: drop 16 bits with rounding
+          V := Int64(Integer(ReadLE32(WavBytes, Offset)));
+          Result[I] := ClampToSmallInt((V + 32768) div 65536 - Ord((V + 32768) mod 65536 < 0));
+        end;
+      end;
   end;
 end;
 
@@ -245,10 +335,7 @@ begin
         raise Exception.CreateFmt('lame_encode_buffer failed: %d', [Mp3Bytes]);
 
       if Mp3Bytes > 0 then
-      begin
         OutStream.WriteBuffer(Mp3Buf[0], Mp3Bytes);
-        AddVbrFrame(Gfp^.internal_flags);
-      end;
 
       Inc(FrameIndex, FramesThisPass);
     end;

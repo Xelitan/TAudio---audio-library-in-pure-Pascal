@@ -236,7 +236,7 @@ begin
   { Byte 1: sync(3) + MPEG ID + layer + protection }
   buffer[1] := $E0;                             { sync bits 11..8 }
   if cfg^.samplerate_out >= 16000 then
-    buffer[1] := buffer[1] or $08;              { MPEG-1 or MPEG-2 id bit }
+    buffer[1] := buffer[1] or $10;              { 0 = MPEG-2.5, 1 = MPEG-1/2 }
   buffer[1] := buffer[1] or (cfg^.version shl 3) and $08;
   buffer[1] := buffer[1] or $02;               { layer 3 = %01 }
   if cfg^.error_protection = 0 then

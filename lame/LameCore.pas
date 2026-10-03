@@ -474,6 +474,206 @@ begin
 end;
 
 { -----------------------------------------------------------------------
+  Resampling (translated from util.c)
+  Used whenever samplerate_out differs from samplerate_in, e.g. when
+  low CBR bitrates select 32/24/22.05/16 kHz output for 44.1 kHz input.
+----------------------------------------------------------------------- }
+function isResamplingNecessary(const cfg: TSessionConfig_t): Boolean;
+var
+  l, h: Integer;
+begin
+  l := Trunc(cfg.samplerate_out * 0.9995);
+  h := Trunc(cfg.samplerate_out * 1.0005);
+  Result := (cfg.samplerate_in < l) or (h < cfg.samplerate_in);
+end;
+
+function gcd(i, j: Integer): Integer;
+begin
+  if j <> 0 then Result := gcd(j, i mod j) else Result := i;
+end;
+
+function blackman(x, fcn: TFloat; l: Integer): TFloat;
+var
+  bkwn, x2, wcn: TFloat;
+begin
+  wcn := LAME_PI * fcn;
+  x := x / l;
+  if x < 0 then x := 0;
+  if x > 1 then x := 1;
+  x2 := x - 0.5;
+
+  bkwn := 0.42 - 0.5 * Cos(2 * x * LAME_PI) + 0.08 * Cos(4 * x * LAME_PI);
+  if Abs(x2) < 1e-9 then
+    Result := wcn / LAME_PI
+  else
+    Result := bkwn * Sin(l * wcn * x2) / (LAME_PI * l * x2);
+end;
+
+{ Resample up to desired_len output samples from inbuf[0..len-1] into outbuf.
+  num_used receives the number of input samples consumed.
+  Returns the number of output samples produced. }
+function fill_buffer_resample(gfc: PLameInternalFlags;
+                              outbuf: PSampleArray;
+                              desired_len: Integer;
+                              inbuf: PSampleArray;
+                              len: Integer;
+                              out num_used: Integer;
+                              ch: Integer): Integer;
+var
+  cfg:            PSessionConfig_t;
+  esv:            PEncStateVar_t;
+  resample_ratio: Double;
+  BLACKSIZE:      Integer;
+  offset, xvalue: TFloat;
+  i, j, k, joff:  Integer;
+  j2, n_shift:    Integer;
+  filter_l:       Integer;
+  fcn, sum:       TFloat;
+  intratio:       Integer;
+  bpc:            Integer;
+  time0:          Double;
+  y:              TSample;
+  inbuf_old:      PSampleArray;
+begin
+  cfg := @gfc^.cfg;
+  esv := @gfc^.sv_enc;
+  resample_ratio := cfg^.samplerate_in / cfg^.samplerate_out;
+
+  bpc := cfg^.samplerate_out div gcd(cfg^.samplerate_out, cfg^.samplerate_in);
+  if bpc > BPC then bpc := BPC;
+
+  intratio := Ord(Abs(resample_ratio - Floor(0.5 + resample_ratio)) < 1.19209290e-7);
+  fcn := 1.0 / resample_ratio;
+  if fcn > 1.0 then fcn := 1.0;
+  filter_l := 31 + intratio;   { odd unless resample_ratio is an integer }
+  BLACKSIZE := filter_l + 1;   { size of data needed for FIR }
+
+  if esv^.fill_buffer_resample_init = 0 then
+  begin
+    FillChar(esv^.inbuf_old, SizeOf(esv^.inbuf_old), 0);
+    esv^.itime[0] := 0;
+    esv^.itime[1] := 0;
+
+    { precompute blackman filter coefficients }
+    for j := 0 to 2 * bpc do
+    begin
+      esv^.blackfilt[j] := AllocMem(BLACKSIZE * SizeOf(TSample));
+      sum := 0;
+      offset := (j - bpc) / (2.0 * bpc);
+      for i := 0 to filter_l do
+      begin
+        esv^.blackfilt[j]^[i] := blackman(i - offset, fcn, filter_l);
+        sum := sum + esv^.blackfilt[j]^[i];
+      end;
+      for i := 0 to filter_l do
+        esv^.blackfilt[j]^[i] := esv^.blackfilt[j]^[i] / sum;
+    end;
+    esv^.fill_buffer_resample_init := 1;
+  end;
+
+  inbuf_old := PSampleArray(@esv^.inbuf_old[ch][0]);
+
+  { time of j'th element in inbuf = itime + j/ifreq;
+    time of k'th element in outbuf = j/ofreq }
+  j := 0;
+  k := 0;
+  while k < desired_len do
+  begin
+    time0 := k * resample_ratio;   { time of k'th output sample }
+    j := Floor(time0 - esv^.itime[ch]);
+
+    { check if we need more input data }
+    if (filter_l + j - filter_l div 2) >= len then
+      Break;
+
+    { blackman window centered at time0 }
+    offset := time0 - esv^.itime[ch] - (j + 0.5 * (filter_l mod 2));
+
+    { closest precomputed window for this offset }
+    joff := Floor(offset * 2 * bpc + bpc + 0.5);
+
+    xvalue := 0;
+    for i := 0 to filter_l do
+    begin
+      j2 := i + j - filter_l div 2;
+      if j2 < 0 then y := inbuf_old^[BLACKSIZE + j2]
+      else           y := inbuf^[j2];
+      xvalue := xvalue + y * esv^.blackfilt[joff]^[i];
+    end;
+    outbuf^[k] := xvalue;
+    Inc(k);
+  end;
+
+  { number of input samples used }
+  num_used := Min(len, filter_l + j - filter_l div 2);
+
+  { advance input time counter so the next output sample is at time 0 }
+  esv^.itime[ch] := esv^.itime[ch] + num_used - k * resample_ratio;
+
+  { save the last BLACKSIZE samples into inbuf_old }
+  if num_used >= BLACKSIZE then
+  begin
+    for i := 0 to BLACKSIZE - 1 do
+      inbuf_old^[i] := inbuf^[num_used + i - BLACKSIZE];
+  end
+  else
+  begin
+    n_shift := BLACKSIZE - num_used;
+    for i := 0 to n_shift - 1 do
+      inbuf_old^[i] := inbuf_old^[i + num_used];
+    j := 0;
+    for i := n_shift to BLACKSIZE - 1 do
+    begin
+      inbuf_old^[i] := inbuf^[j];
+      Inc(j);
+    end;
+  end;
+
+  Result := k;
+end;
+
+{ Copy new samples from in_buffer into mfbuf, resampling if necessary.
+  n_in = input samples consumed, n_out = samples added to mfbuf. }
+procedure fill_buffer(gfc: PLameInternalFlags;
+                      ib0, ib1: PSampleArray;
+                      nsamples: Integer;
+                      out n_in, n_out: Integer);
+var
+  cfg:       PSessionConfig_t;
+  esv:       PEncStateVar_t;
+  framesize: Integer;
+  ch:        Integer;
+  src:       PSampleArray;
+begin
+  cfg := @gfc^.cfg;
+  esv := @gfc^.sv_enc;
+  framesize := 576 * cfg^.mode_gr;
+  n_in := 0;
+  n_out := 0;
+
+  if isResamplingNecessary(cfg^) then
+  begin
+    for ch := 0 to cfg^.channels_out - 1 do
+    begin
+      if ch = 0 then src := ib0 else src := ib1;
+      n_out := fill_buffer_resample(gfc,
+                                    PSampleArray(@esv^.mfbuf[ch][esv^.mf_size]),
+                                    framesize, src, nsamples, n_in, ch);
+    end;
+  end
+  else
+  begin
+    n_out := Min(framesize, nsamples);
+    for ch := 0 to cfg^.channels_out - 1 do
+    begin
+      if ch = 0 then src := ib0 else src := ib1;
+      Move(src^[0], esv^.mfbuf[ch][esv^.mf_size], n_out * SizeOf(TSample));
+    end;
+    n_in := n_out;
+  end;
+end;
+
+{ -----------------------------------------------------------------------
   lame_encode_buffer_sample_t
   Inner encoding loop: reads samples already in esv->in_buffer_0/1,
   fills mfbuf, and encodes complete frames.
@@ -490,7 +690,7 @@ var
   mp3out:             Integer;
   ret:                Integer;
   ch, i:              Integer;
-  n_copy:             Integer;
+  n_in, n_out:        Integer;
   buf_size:           Integer;
   mfbuf0, mfbuf1:     PSampleArray;
   ib0, ib1:           PSampleArray;
@@ -537,24 +737,16 @@ begin
 
   while nsamples > 0 do
   begin
-    { copy min(pcm_samples_per_frame, nsamples) into mfbuf }
-    if pcm_samples_per_frame < nsamples then n_copy := pcm_samples_per_frame
-    else                                     n_copy := nsamples;
+    { copy new samples into mfbuf, resampling if necessary }
+    fill_buffer(gfc, PSampleArray(@ib0^[ibpos]), PSampleArray(@ib1^[ibpos]),
+                nsamples, n_in, n_out);
 
-    for ch := 0 to cfg^.channels_out - 1 do
-    begin
-      if ch = 0 then
-        Move(ib0^[ibpos], mfbuf0^[esv^.mf_size], n_copy * SizeOf(TSample))
-      else
-        Move(ib1^[ibpos], mfbuf1^[esv^.mf_size], n_copy * SizeOf(TSample));
-    end;
-
-    Dec(nsamples, n_copy);
-    Inc(ibpos, n_copy);
-    Inc(esv^.mf_size, n_copy);
+    Dec(nsamples, n_in);
+    Inc(ibpos, n_in);
+    Inc(esv^.mf_size, n_out);
     if esv^.mf_samples_to_encode < 1 then
       esv^.mf_samples_to_encode := ENCDELAY + POSTDELAY;
-    Inc(esv^.mf_samples_to_encode, n_copy);
+    Inc(esv^.mf_samples_to_encode, n_out);
 
     { encode frame(s) while buffer is full enough }
     while esv^.mf_size >= mf_needed do
@@ -684,8 +876,16 @@ end;
   Free all sub-allocations inside gfc (does not free gfc itself).
 ----------------------------------------------------------------------- }
 procedure freegfc(gfc: PLameInternalFlags);
+var
+  i: Integer;
 begin
   if gfc = nil then Exit;
+  for i := 0 to 2 * BPC do
+    if gfc^.sv_enc.blackfilt[i] <> nil then
+    begin
+      FreeMem(gfc^.sv_enc.blackfilt[i]);
+      gfc^.sv_enc.blackfilt[i] := nil;
+    end;
   lame_free_ath(gfc^.ATH);
   lame_free_psy(gfc^.cd_psy);
   if gfc^.sv_enc.in_buffer_0 <> nil then
@@ -1262,6 +1462,7 @@ var
   mp3count:               Integer;
   mp3buf_remaining:       Integer;
   imp3:                   Integer;
+  resample_ratio:         Double;
 begin
   if gfp = nil then begin Result := -3; Exit; end;
   if gfp^.class_id <> LAME_ID then begin Result := -3; Exit; end;
@@ -1285,6 +1486,14 @@ begin
   FillChar(silence, SizeOf(silence), 0);
   mp3count := 0;
   imp3     := 0;
+  resample_ratio := 1;
+
+  if isResamplingNecessary(cfg^) then
+  begin
+    resample_ratio := cfg^.samplerate_in / cfg^.samplerate_out;
+    { delay due to resampling; needs to be fixed if resampling code changes }
+    samples_to_encode := samples_to_encode + Trunc(16.0 / resample_ratio);
+  end;
 
   end_padding := pcm_samples_per_frame - (samples_to_encode mod pcm_samples_per_frame);
   if end_padding < 576 then
@@ -1296,7 +1505,7 @@ begin
   while (frames_left > 0) and (imp3 >= 0) do
   begin
     frame_num := gfc^.ov_enc.frame_number;
-    bunch     := mf_needed - esv^.mf_size;
+    bunch     := Trunc((mf_needed - esv^.mf_size) * resample_ratio);
     if bunch > 1152 then bunch := 1152;
     if bunch <    1 then bunch := 1;
 

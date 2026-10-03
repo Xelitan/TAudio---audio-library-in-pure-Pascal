@@ -34,16 +34,7 @@ implementation
 
 {$POINTERMATH ON}
 
-uses LameMDCT, LamePsyModel, LameQuantize, LameBitstream, Math;
-
-{ -----------------------------------------------------------------------
-  AddVbrFrame stub
-  (VBR tag writing not yet implemented; does nothing in CBR mode)
------------------------------------------------------------------------ }
-procedure AddVbrFrame(gfc: PLameInternalFlags);
-begin
-  { stub — LameVbrTag.pas not yet translated }
-end;
+uses LameMDCT, LamePsyModel, LameQuantize, LameBitstream, LameVbrTag, Math;
 
 { -----------------------------------------------------------------------
   adjust_ATH

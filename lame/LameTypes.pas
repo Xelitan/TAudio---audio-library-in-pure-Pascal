@@ -320,7 +320,8 @@ type
     amp_filter:  array[0..31] of TFloat;
     itime:       array[0..1] of TFloat8;
     inbuf_old:   array[0..1] of array[0..BLKSIZE + 576 + MDCTDELAY] of TSample;
-    blackfilt:   array[0..2 * BPC] of TFloat8;
+    blackfilt:   array[0..2 * BPC] of PSampleArray;  { resampler FIR kernels }
+    fill_buffer_resample_init: Integer;
     pefirbuf:    array[0..18] of TFloat;
     frac_SpF:    TFloat;
     slot_lag:    TFloat;
