@@ -12,7 +12,7 @@
     </CompilerOptions>
     <Description Value="Play and edit audio files. Supports WAV, MP3, OGG, AIFF, AU, CAF, M4A, AAC, AC3, E-AC3, MKV, AVI, MOD, XM, S3M, IT"/>
     <License Value="MIT"/>
-    <Version Major="1"/>
+    <Version Major="1" Minor="2"/>
     <Files Count="38">
       <Item1>
         <Filename Value="XelAudio.pas"/>
